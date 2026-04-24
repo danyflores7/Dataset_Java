@@ -1,0 +1,16 @@
+# Entornos de Python
+__pycache__/
+*.pyc
+
+# Archivos pesados y directorios de datos brutos
+dataset_clones_java/model_ready/
+dataset_clones_java/metadata/*.db
+dataset_clones_java/metadata/*.csv
+dataset_clones_java/metadata/*.jar
+dataset_clones_java/metadata/*.class
+dataset_clones_java/tipos_1_2_3_CodeXGLUE/
+dataset_clones_java/tipo_4_GPTCloneBench/
+
+# Archivos del SO
+.DS_Store
+*.zip
