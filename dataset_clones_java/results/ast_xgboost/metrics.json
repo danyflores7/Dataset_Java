@@ -1,0 +1,13 @@
+{
+  "model": "AST + XGBoost",
+  "accuracy": 0.7773556231003039,
+  "macro_f1": 0.7609544601889613,
+  "weighted_f1": 0.7771237794223831,
+  "train_size": 12281,
+  "valid_size": 2632,
+  "test_size": 2632,
+  "feature_count": 58,
+  "parse_success_rate_train": 0.9901473821350053,
+  "parse_success_rate_valid": 0.9897416413373861,
+  "parse_success_rate_test": 0.9912613981762918
+}
