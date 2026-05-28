@@ -1,0 +1,194 @@
+[
+  {
+    "model": "TF-IDF + XGBoost",
+    "class": "MT3",
+    "precision": 0.5905,
+    "recall": 0.6089,
+    "f1_score": 0.5996,
+    "support": 450
+  },
+  {
+    "model": "TF-IDF + XGBoost",
+    "class": "ST3",
+    "precision": 0.8251,
+    "recall": 0.8489,
+    "f1_score": 0.8368,
+    "support": 450
+  },
+  {
+    "model": "TF-IDF + XGBoost",
+    "class": "T0",
+    "precision": 0.9626,
+    "recall": 0.9733,
+    "f1_score": 0.968,
+    "support": 450
+  },
+  {
+    "model": "TF-IDF + XGBoost",
+    "class": "T1",
+    "precision": 0.9871,
+    "recall": 1.0,
+    "f1_score": 0.9935,
+    "support": 229
+  },
+  {
+    "model": "TF-IDF + XGBoost",
+    "class": "T2",
+    "precision": 0.9792,
+    "recall": 0.9038,
+    "f1_score": 0.94,
+    "support": 52
+  },
+  {
+    "model": "TF-IDF + XGBoost",
+    "class": "T4",
+    "precision": 0.9956,
+    "recall": 0.9978,
+    "f1_score": 0.9967,
+    "support": 450
+  },
+  {
+    "model": "TF-IDF + XGBoost",
+    "class": "VST3",
+    "precision": 0.9143,
+    "recall": 0.9505,
+    "f1_score": 0.932,
+    "support": 101
+  },
+  {
+    "model": "TF-IDF + XGBoost",
+    "class": "WT3",
+    "precision": 0.7488,
+    "recall": 0.6889,
+    "f1_score": 0.7176,
+    "support": 450
+  },
+  {
+    "model": "AST + XGBoost",
+    "class": "MT3",
+    "precision": 0.6928,
+    "recall": 0.7467,
+    "f1_score": 0.7187,
+    "support": 450
+  },
+  {
+    "model": "AST + XGBoost",
+    "class": "ST3",
+    "precision": 0.8592,
+    "recall": 0.9089,
+    "f1_score": 0.8834,
+    "support": 450
+  },
+  {
+    "model": "AST + XGBoost",
+    "class": "T0",
+    "precision": 0.633,
+    "recall": 0.5289,
+    "f1_score": 0.5763,
+    "support": 450
+  },
+  {
+    "model": "AST + XGBoost",
+    "class": "T1",
+    "precision": 0.9784,
+    "recall": 0.7904,
+    "f1_score": 0.8744,
+    "support": 229
+  },
+  {
+    "model": "AST + XGBoost",
+    "class": "T2",
+    "precision": 0.43,
+    "recall": 0.8269,
+    "f1_score": 0.5658,
+    "support": 52
+  },
+  {
+    "model": "AST + XGBoost",
+    "class": "T4",
+    "precision": 0.9758,
+    "recall": 0.9867,
+    "f1_score": 0.9812,
+    "support": 450
+  },
+  {
+    "model": "AST + XGBoost",
+    "class": "VST3",
+    "precision": 0.8191,
+    "recall": 0.7624,
+    "f1_score": 0.7897,
+    "support": 101
+  },
+  {
+    "model": "AST + XGBoost",
+    "class": "WT3",
+    "precision": 0.6898,
+    "recall": 0.7067,
+    "f1_score": 0.6981,
+    "support": 450
+  },
+  {
+    "model": "Hybrid TF-IDF + AST + XGBoost",
+    "class": "MT3",
+    "precision": 0.819634703196347,
+    "recall": 0.7977777777777778,
+    "f1_score": 0.8085585585585585,
+    "support": 450
+  },
+  {
+    "model": "Hybrid TF-IDF + AST + XGBoost",
+    "class": "ST3",
+    "precision": 0.8789808917197452,
+    "recall": 0.92,
+    "f1_score": 0.8990228013029316,
+    "support": 450
+  },
+  {
+    "model": "Hybrid TF-IDF + AST + XGBoost",
+    "class": "T0",
+    "precision": 0.9707865168539326,
+    "recall": 0.96,
+    "f1_score": 0.9653631284916201,
+    "support": 450
+  },
+  {
+    "model": "Hybrid TF-IDF + AST + XGBoost",
+    "class": "T1",
+    "precision": 0.9956331877729258,
+    "recall": 0.9956331877729258,
+    "f1_score": 0.9956331877729258,
+    "support": 229
+  },
+  {
+    "model": "Hybrid TF-IDF + AST + XGBoost",
+    "class": "T2",
+    "precision": 0.9803921568627451,
+    "recall": 0.9615384615384616,
+    "f1_score": 0.970873786407767,
+    "support": 52
+  },
+  {
+    "model": "Hybrid TF-IDF + AST + XGBoost",
+    "class": "T4",
+    "precision": 0.9933774834437086,
+    "recall": 1.0,
+    "f1_score": 0.9966777408637874,
+    "support": 450
+  },
+  {
+    "model": "Hybrid TF-IDF + AST + XGBoost",
+    "class": "VST3",
+    "precision": 0.9797979797979798,
+    "recall": 0.9603960396039604,
+    "f1_score": 0.97,
+    "support": 101
+  },
+  {
+    "model": "Hybrid TF-IDF + AST + XGBoost",
+    "class": "WT3",
+    "precision": 0.9035874439461884,
+    "recall": 0.8955555555555555,
+    "f1_score": 0.8995535714285714,
+    "support": 450
+  }
+]

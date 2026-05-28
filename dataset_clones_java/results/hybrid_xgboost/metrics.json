@@ -1,0 +1,16 @@
+{
+  "model": "Hybrid TF-IDF + AST + XGBoost",
+  "accuracy": 0.9243920972644377,
+  "macro_f1": 0.9382103468532702,
+  "weighted_f1": 0.9242342504497206,
+  "train_size": 12281,
+  "valid_size": 2632,
+  "test_size": 2632,
+  "feature_count": 2059,
+  "tfidf_feature_count": 2001,
+  "ast_feature_count": 58,
+  "tfidf_max_features": 1000,
+  "parse_success_rate_train": 0.9901473821350053,
+  "parse_success_rate_valid": 0.9897416413373861,
+  "parse_success_rate_test": 0.9912613981762918
+}
