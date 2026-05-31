@@ -141,7 +141,7 @@ def compile_batch(records: list, work_dir: Path) -> dict:
 
     # Intento 1: compilación normal con -nowarn
     result = subprocess.run(
-        ["javac", "-nowarn", "-d", str(work_dir)] + java_files,
+        ["javac", "-nowarn", "--release", "11", "-d", str(work_dir)] + java_files,
         capture_output=True, text=True, timeout=300
     )
 
@@ -161,7 +161,7 @@ def compile_batch(records: list, work_dir: Path) -> dict:
             if not java_path.exists():
                 continue
             r = subprocess.run(
-                ["javac", "-nowarn", "-d", str(work_dir), str(java_path)],
+                ["javac", "-nowarn", "--release", "11", "-d", str(work_dir), str(java_path)],
                 capture_output=True, text=True, timeout=30
             )
             if (work_dir / f"{cname}.class").exists():
