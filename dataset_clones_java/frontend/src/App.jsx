@@ -45,10 +45,10 @@ function ConfidenceBadge({ confidence }) {
 }
 
 function PredictionBadge({ prediction }) {
-  const isClone = prediction?.toLowerCase().includes("clone") || prediction?.toLowerCase().includes("plagio");
+  const isClone = prediction && prediction !== "T0";
   return (
     <span className={`prediction-badge ${isClone ? "badge-clone" : "badge-original"}`}>
-      {isClone ? "⚠ Plagio detectado" : "✓ Original"}
+      {isClone ? `⚠ Plagio detectado (${prediction})` : "✓ Original"}
     </span>
   );
 }
@@ -109,7 +109,7 @@ export default function App() {
   };
 
   const cloneCount = folderResults.filter(r =>
-    r.prediction?.toLowerCase().includes("clone") || r.prediction?.toLowerCase().includes("plagio")
+    r.prediction && r.prediction !== "T0"
   ).length;
 
   return (
@@ -229,7 +229,7 @@ export default function App() {
             </div>
 
             {result && (
-              <div className={`result-card ${(result.prediction?.toLowerCase().includes("clone") || result.prediction?.toLowerCase().includes("plagio")) ? "result-card--alert" : "result-card--clear"}`}>
+              <div className={`result-card ${(result.prediction && result.prediction !== "T0") ? "result-card--alert" : "result-card--clear"}`}>
                 <div className="result-header">
                   <h2 className="result-title">Resultado del análisis</h2>
                 </div>
@@ -347,7 +347,7 @@ export default function App() {
                       </thead>
                       <tbody>
                         {folderResults.map((row, index) => {
-                          const isClone = row.prediction?.toLowerCase().includes("clone") || row.prediction?.toLowerCase().includes("plagio");
+                          const isClone = row.prediction && row.prediction !== "T0";
                           return (
                             <tr key={index} className={isClone ? "row-alert" : ""}>
                               <td className="td-num">{index + 1}</td>

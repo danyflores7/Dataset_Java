@@ -1,4 +1,4 @@
 file1,file2,prediction,confidence
-A.java,B.java,T4,0.9997528195381165
-A.java,C.java,T4,0.9998996257781982
-B.java,C.java,T4,0.9997339844703674
+B.java,C.java,ST3,0.9855751991271973
+B.java,A.java,ST3,0.9327733516693115
+C.java,A.java,ST3,0.815667450428009

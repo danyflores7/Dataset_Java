@@ -1,8 +1,8 @@
 {
   "model": "Hybrid TF-IDF + AST + XGBoost",
-  "accuracy": 0.9133822181484876,
-  "macro_f1": 0.9336601028490276,
-  "weighted_f1": 0.9131836033392889,
+  "accuracy": 0.9106324472960586,
+  "macro_f1": 0.930634753436229,
+  "weighted_f1": 0.9106247814173548,
   "train_size": 10181,
   "valid_size": 2182,
   "test_size": 2182,
