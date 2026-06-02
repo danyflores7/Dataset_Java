@@ -46,9 +46,10 @@ function ConfidenceBadge({ confidence }) {
 
 function PredictionBadge({ prediction }) {
   const isClone = prediction && prediction !== "T0";
+  const displayPrediction = prediction && prediction.endsWith("T3") ? "T3" : prediction;
   return (
     <span className={`prediction-badge ${isClone ? "badge-clone" : "badge-original"}`}>
-      {isClone ? `⚠ Plagio detectado (${prediction})` : "✓ Original"}
+      {isClone ? `⚠ Plagio detectado (${displayPrediction})` : "✓ Original"}
     </span>
   );
 }
