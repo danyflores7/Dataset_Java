@@ -1,0 +1,82 @@
+# Informe de estado del arte: CodeBERT vs modelo hibrido
+
+## Protocolo actual
+
+La comparacion activa ya no considera `T4` en ningun modelo. Los registros `T4`
+se excluyen de train, valid y test para los modelos reentrenados. Esta decision
+evita convertir equivalencia funcional en una alerta directa para un producto
+educativo.
+
+Clases activas:
+
+`T0`, `T1`, `T2`, `VST3`, `ST3`, `MT3`, `WT3`
+
+`T4` queda fuera de la comparacion principal.
+
+## Comparacion principal no-T4
+
+Resultados consolidados en:
+
+`Dataset_Java/dataset_clones_java/results/model_comparison_metrics_no_t4.csv`
+
+| Modelo | Accuracy | Macro F1 | Weighted F1 | Nota |
+|---|---:|---:|---:|---|
+| TF-IDF + XGBoost | 0.8185 | 0.8585 | 0.8180 | Reentrenado sin T4 |
+| AST + XGBoost | 0.7346 | 0.7296 | 0.7346 | Reentrenado sin T4 |
+| Hybrid TF-IDF + AST + XGBoost | 0.9134 | 0.9337 | 0.9132 | Reentrenado sin T4 |
+| CodeBERT + XGBoost | 0.7933 | 0.8413 | 0.7932 | Evaluacion post-hoc sin T4 |
+
+## Nota sobre CodeBERT
+
+CodeBERT se mantiene como comparacion de estado del arte porque representa una
+familia de modelos pre-entrenados sobre codigo fuente y permite comparar el
+hibrido contra embeddings semanticos, no solo contra senales lexicas o
+estructurales.
+
+En esta iteracion no se recalcularon todos los embeddings de CodeBERT. Se uso la
+matriz de confusion ya disponible del pull reciente y se genero una evaluacion
+post-hoc sin `T4`:
+
+`Dataset_Java/dataset_clones_java/results/codebert_xgboost/metrics_no_t4_eval.json`
+
+Esta evaluacion excluye las filas donde la clase real era `T4`. Si el modelo
+predijo `T4` para una clase activa, esa prediccion se conserva como error. Por
+eso el resultado no infla artificialmente el desempeno.
+
+Cuando se recalculen todos los embeddings, CodeBERT debe reentrenarse desde los
+splits oficiales ya filtrados sin `T4`.
+
+## Vista binaria de producto
+
+La evaluacion binaria no reemplaza la tarea multiclase. Sirve para medir la
+utilidad de producto:
+
+`T0` -> `no_alert`
+
+`T1`, `T2`, `VST3`, `ST3`, `MT3`, `WT3` -> `review_required`
+
+Resultados del hibrido reentrenado sin `T4`:
+
+| Metrica | Valor |
+|---|---:|
+| Accuracy | 0.9863 |
+| Macro F1 | 0.9790 |
+| Balanced accuracy | 0.9798 |
+| Recall no_alert | 0.9689 |
+| Recall review_required | 0.9908 |
+| False positive rate | 0.0311 |
+| F1 review_required | 0.9913 |
+
+Resultados binarios de CodeBERT post-hoc sin `T4`:
+
+| Metrica | Valor |
+|---|---:|
+| Macro F1 | 0.8875 |
+| Balanced accuracy | 0.8929 |
+
+## Conclusion
+
+Con el protocolo no-T4, el modelo hibrido TF-IDF + AST + XGBoost supera a los
+baselines clasicos y tambien a la evaluacion post-hoc disponible de CodeBERT.
+La comparacion definitiva contra CodeBERT queda pendiente de recalcular
+embeddings completos y reentrenar el clasificador sin `T4`.

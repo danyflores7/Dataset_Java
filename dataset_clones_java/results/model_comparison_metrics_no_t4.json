@@ -1,0 +1,58 @@
+[
+  {
+    "model": "TF-IDF + XGBoost",
+    "evaluation": "multiclass_no_t4",
+    "accuracy": 0.8185151237396884,
+    "macro_f1": 0.8584842868145025,
+    "weighted_f1": 0.8179582124806793,
+    "train_size": 10181,
+    "valid_size": 2182,
+    "test_size": 2182,
+    "excluded_classes": "T4",
+    "posthoc_filter": false,
+    "retrained_without_t4": true,
+    "metrics_file": "tfidf_xgboost\\metrics.json"
+  },
+  {
+    "model": "AST + XGBoost",
+    "evaluation": "multiclass_no_t4",
+    "accuracy": 0.7346471127406049,
+    "macro_f1": 0.7296112033314841,
+    "weighted_f1": 0.7345592561689904,
+    "train_size": 10181,
+    "valid_size": 2182,
+    "test_size": 2182,
+    "excluded_classes": "T4",
+    "posthoc_filter": false,
+    "retrained_without_t4": true,
+    "metrics_file": "ast_xgboost\\metrics.json"
+  },
+  {
+    "model": "Hybrid TF-IDF + AST + XGBoost",
+    "evaluation": "multiclass_no_t4",
+    "accuracy": 0.9133822181484876,
+    "macro_f1": 0.9336601028490276,
+    "weighted_f1": 0.9131836033392889,
+    "train_size": 10181,
+    "valid_size": 2182,
+    "test_size": 2182,
+    "excluded_classes": "T4",
+    "posthoc_filter": false,
+    "retrained_without_t4": true,
+    "metrics_file": "hybrid_xgboost\\metrics.json"
+  },
+  {
+    "model": "CodeBERT + XGBoost (post-hoc no T4)",
+    "evaluation": "multiclass_posthoc_no_t4",
+    "accuracy": 0.7933088909257562,
+    "macro_f1": 0.8413176840762974,
+    "weighted_f1": 0.7931742303350109,
+    "train_size": "",
+    "valid_size": "",
+    "test_size": 2182,
+    "excluded_classes": "T4",
+    "posthoc_filter": true,
+    "retrained_without_t4": false,
+    "metrics_file": "codebert_xgboost\\metrics_no_t4_eval.json"
+  }
+]

@@ -5,12 +5,13 @@
     "macro_f1": 0.873,
     "weighted_f1": 0.8449,
     "feature_count": 2001,
-    "train_size": 12281,
-    "valid_size": 2632,
-    "test_size": 2632,
+    "train_size": 10181,
+    "valid_size": 2182,
+    "test_size": 2182,
     "parse_success_rate_train": "",
     "parse_success_rate_valid": "",
-    "parse_success_rate_test": ""
+    "parse_success_rate_test": "",
+    "excluded_classes": "T4"
   },
   {
     "model": "AST + XGBoost",
@@ -23,19 +24,21 @@
     "test_size": 2632,
     "parse_success_rate_train": 0.9901473821350053,
     "parse_success_rate_valid": 0.9897416413373861,
-    "parse_success_rate_test": 0.9912613981762918
+    "parse_success_rate_test": 0.9912613981762918,
+    "excluded_classes": "T4"
   },
   {
     "model": "Hybrid TF-IDF + AST + XGBoost",
-    "accuracy": 0.9243920972644377,
-    "macro_f1": 0.9382103468532702,
-    "weighted_f1": 0.9242342504497206,
+    "accuracy": 0.9133822181484876,
+    "macro_f1": 0.9336601028490276,
+    "weighted_f1": 0.9131836033392889,
     "feature_count": 2059,
-    "train_size": 12281,
-    "valid_size": 2632,
-    "test_size": 2632,
-    "parse_success_rate_train": 0.9901473821350053,
-    "parse_success_rate_valid": 0.9897416413373861,
-    "parse_success_rate_test": 0.9912613981762918
+    "train_size": 10181,
+    "valid_size": 2182,
+    "test_size": 2182,
+    "parse_success_rate_train": 1.0,
+    "parse_success_rate_valid": 1.0,
+    "parse_success_rate_test": 1.0,
+    "excluded_classes": "T4"
   }
 ]

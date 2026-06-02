@@ -2,6 +2,8 @@
 
 Repositorio enfocado en la fase de **Ingeniería de Datos** para la construcción de un dataset unificado de detección de clones en código Java. Este trabajo combina de forma estructurada los repositorios *BigCloneBench (CodeXGLUE)* y *GPTCloneBench* en un formato `JSONL` listo para el entrenamiento de modelos Bi-Encoder (ej. CodeBERT).
 
+> Nota de protocolo: los modelos activos y reportes comparativos actuales excluyen `T4` de train, valid y test. `T4` permanece documentado como parte de la taxonomia/dataset, pero no se usa en la comparacion principal de modelos.
+
 ## 📂 Enlaces a los Datos Pesados
 
 Debido a su gran volumen, el dataset final (`model_ready`) y los binarios de la base de datos no están alojados en este repositorio de GitHub. 

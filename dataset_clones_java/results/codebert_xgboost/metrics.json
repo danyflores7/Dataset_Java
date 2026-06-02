@@ -1,0 +1,12 @@
+{
+  "model": "CodeBERT + XGBoost",
+  "accuracy": 0.8282674772036475,
+  "macro_f1": 0.8606240599193766,
+  "weighted_f1": 0.8278123409803998,
+  "train_size": 12281,
+  "valid_size": 2632,
+  "test_size": 2632,
+  "feature_count": 1537,
+  "device_used": "mps",
+  "execution_time_seconds": 1458.5135879516602
+}

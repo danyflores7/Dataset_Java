@@ -1,13 +1,19 @@
 {
   "model": "AST + XGBoost",
-  "accuracy": 0.7773556231003039,
-  "macro_f1": 0.7609544601889613,
-  "weighted_f1": 0.7771237794223831,
-  "train_size": 12281,
-  "valid_size": 2632,
-  "test_size": 2632,
+  "accuracy": 0.7346471127406049,
+  "macro_f1": 0.7296112033314841,
+  "weighted_f1": 0.7345592561689904,
+  "train_size": 10181,
+  "valid_size": 2182,
+  "test_size": 2182,
+  "train_size_original": 12281,
+  "valid_size_original": 2632,
+  "test_size_original": 2632,
+  "excluded_classes": [
+    "T4"
+  ],
   "feature_count": 58,
-  "parse_success_rate_train": 0.9901473821350053,
-  "parse_success_rate_valid": 0.9897416413373861,
-  "parse_success_rate_test": 0.9912613981762918
+  "parse_success_rate_train": 1.0,
+  "parse_success_rate_valid": 1.0,
+  "parse_success_rate_test": 1.0
 }
