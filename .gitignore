@@ -14,3 +14,7 @@ dataset_clones_java/tipo_4_GPTCloneBench/
 # Archivos del SO
 .DS_Store
 *.zip
+
+# Cache de embeddings numpy de CodeBERT
+dataset_clones_java/results/codebert_xgboost/cache/
+*.npy
