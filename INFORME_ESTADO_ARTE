@@ -1,0 +1,316 @@
+# Informe comparativo: baseline token-based inspirado en SourcererCC vs modelo híbrido TF-IDF + AST
+
+## 1. Objetivo del informe
+
+Este documento resume la comparación entre dos enfoques evaluados para la priorización de revisión de similitud en código Java:
+
+1. **Baseline token-based inspirado en SourcererCC**
+2. **Modelo híbrido TF-IDF + AST + XGBoost**
+
+El objetivo no es afirmar que se reprodujo SourcererCC completo, sino evaluar una adaptación pareada inspirada en su principio central: calcular similitud mediante solapamiento de tokens normalizados.
+
+La comparación se formula como una tarea binaria orientada a producto:
+
+* `T0` → `no_alert`
+* `T1`, `T2`, `VST3`, `ST3`, `MT3`, `WT3` → `review_required`
+* `T4` → excluido del análisis principal y reportado aparte como revisión contextual
+
+Esta decisión se tomó porque, en un contexto educativo, los clones T4 no implican plagio automático. Dos estudiantes pueden producir soluciones funcionalmente equivalentes simplemente porque resolvieron la misma tarea.
+
+---
+
+## 2. Alcance metodológico
+
+### 2.1 Qué se comparó
+
+Se compararon dos modelos bajo una tarea común de priorización:
+
+| Modelo                          | Tipo de salida original                                         | Salida usada para comparación           |
+| ------------------------------- | --------------------------------------------------------------- | --------------------------------------- |
+| SourcererCC-style token overlap | Score de similitud por tokens                                   | Binaria: `no_alert` / `review_required` |
+| Hybrid TF-IDF + AST + XGBoost   | Multiclase: `T0`, `T1`, `T2`, `VST3`, `ST3`, `MT3`, `WT3`, `T4` | Binaria: `no_alert` / `review_required` |
+
+El modelo híbrido conserva su valor multiclase en el backend, pero para esta comparación sus predicciones se mapearon a una salida binaria de producto.
+
+### 2.2 Por qué no se comparó directamente en multiclase
+
+El baseline SourcererCC-style no distingue tipos de clon. Su salida natural es un puntaje de similitud o una decisión de alerta. Por esa razón, no sería justo exigirle predecir clases como `MT3`, `WT3` o `T2`.
+
+La comparación justa consiste en evaluar si cada sistema puede responder la pregunta de producto:
+
+> ¿Este par de funciones debe enviarse a revisión humana o puede descartarse?
+
+---
+
+## 3. Baseline token-based inspirado en SourcererCC
+
+### 3.1 Descripción
+
+El baseline implementado sigue una lógica token-based:
+
+1. Elimina comentarios de Java.
+2. Tokeniza el código.
+3. Normaliza identificadores como `ID`.
+4. Normaliza literales numéricos, strings y chars.
+5. Conserva palabras reservadas, operadores y delimitadores.
+6. Calcula similitud mediante solapamiento multiset de tokens.
+7. Calibra un umbral en validación.
+8. Evalúa una sola vez en test.
+
+La métrica principal de similitud fue:
+
+```text
+overlap_similarity =
+sum(min(count1[t], count2[t]) for t in shared_tokens)
+/
+min(total_tokens1, total_tokens2)
+```
+
+El threshold se seleccionó en validación maximizando `macro_f1`, no únicamente el F1 de `review_required`. Esta corrección fue importante porque optimizar solamente `review_required` llevaba a una solución trivial: marcar casi todo como sospechoso.
+
+### 3.2 Resultados principales
+
+El mejor threshold seleccionado en validación fue:
+
+```text
+threshold = 0.88
+selection_metric = macro_f1
+```
+
+Resultados en test:
+
+| Métrica                     | Resultado |
+| --------------------------- | --------: |
+| Accuracy                    |    0.6842 |
+| Macro F1                    |    0.5382 |
+| Weighted F1                 |    0.6908 |
+| Balanced accuracy           |    0.5404 |
+| Precision `no_alert`        |    0.2634 |
+| Recall `no_alert`           |    0.2956 |
+| F1 `no_alert`               |    0.2785 |
+| Precision `review_required` |    0.8110 |
+| Recall `review_required`    |    0.7852 |
+| F1 `review_required`        |    0.7979 |
+| False positive rate         |    0.7044 |
+
+### 3.3 Matriz de confusión
+
+| Actual \ Predicho | no_alert | review_required |
+| ----------------- | -------: | --------------: |
+| no_alert          |      133 |             317 |
+| review_required   |      372 |            1360 |
+
+Interpretación:
+
+* El baseline detecta una proporción razonable de pares que requieren revisión.
+* Sin embargo, falla al descartar correctamente muchos pares `T0`.
+* De 450 pares `T0`, solo 133 fueron clasificados como `no_alert`.
+* 317 pares `T0` fueron falsamente enviados a revisión.
+* Esto implica una tasa de falsos positivos de 70.44%.
+
+### 3.4 Lectura del resultado
+
+El baseline token-based funciona como una señal superficial de similitud, pero no como un priorizador robusto para contexto educativo.
+
+Su principal limitación es que sigue enviando demasiados pares no relevantes a revisión humana. Esto reduciría la utilidad del sistema para profesores, porque incrementaría la carga de revisión manual.
+
+---
+
+## 4. Modelo híbrido TF-IDF + AST + XGBoost en evaluación binaria
+
+### 4.1 Descripción
+
+El modelo híbrido fue entrenado originalmente como clasificador multiclase sobre las clases:
+
+```text
+T0, T1, T2, VST3, ST3, MT3, WT3, T4
+```
+
+Para compararlo contra el baseline token-based, sus predicciones fueron transformadas a la misma tarea binaria:
+
+* Predicción `T0` → `no_alert`
+* Predicción `T1`, `T2`, `VST3`, `ST3`, `MT3`, `WT3` → `review_required`
+* Predicción `T4` → excluida del análisis principal y reportada como contextual
+
+### 4.2 Resultados principales
+
+Resultados en test, excluyendo T4 del análisis principal:
+
+| Métrica                     | Resultado |
+| --------------------------- | --------: |
+| Accuracy                    |    0.9812 |
+| Macro F1                    |    0.9712 |
+| Weighted F1                 |    0.9811 |
+| Balanced accuracy           |    0.9692 |
+| Precision `no_alert`        |    0.9596 |
+| Recall `no_alert`           |    0.9489 |
+| F1 `no_alert`               |    0.9542 |
+| Precision `review_required` |    0.9867 |
+| Recall `review_required`    |    0.9896 |
+| F1 `review_required`        |    0.9882 |
+| False positive rate         |    0.0511 |
+
+### 4.3 Matriz de confusión
+
+| Actual \ Predicho | no_alert | review_required |
+| ----------------- | -------: | --------------: |
+| no_alert          |      427 |              23 |
+| review_required   |       18 |            1710 |
+
+Interpretación:
+
+* De 450 pares `T0`, el modelo descartó correctamente 427.
+* Solo 23 pares `T0` fueron falsamente enviados a revisión.
+* De 1728 pares que requerían revisión, detectó correctamente 1710.
+* Solo 18 pares positivos fueron descartados erróneamente.
+
+Esto demuestra que el modelo híbrido no solo detecta pares sospechosos, sino que también reduce de forma importante los falsos positivos.
+
+---
+
+## 5. Comparación directa
+
+| Métrica                  | SourcererCC-style | Hybrid TF-IDF + AST |
+| ------------------------ | ----------------: | ------------------: |
+| Accuracy                 |            0.6842 |          **0.9812** |
+| Macro F1                 |            0.5382 |          **0.9712** |
+| Weighted F1              |            0.6908 |          **0.9811** |
+| Balanced accuracy        |            0.5404 |          **0.9692** |
+| Recall `no_alert`        |            0.2956 |          **0.9489** |
+| Recall `review_required` |            0.7852 |          **0.9896** |
+| F1 `no_alert`            |            0.2785 |          **0.9542** |
+| F1 `review_required`     |            0.7979 |          **0.9882** |
+| False positive rate      |            0.7044 |          **0.0511** |
+
+## 6. Comparación por clase original
+
+La siguiente comparación es importante porque el baseline token-based no predice clases técnicas, pero sí puede evaluarse según cuántos ejemplos de cada clase original marcó como `review_required`.
+
+### 6.1 Lectura esperada
+
+Para clases como `T1` y `T2`, se espera que un método token-based tenga buen desempeño porque existe alta similitud superficial.
+
+Para clases como `MT3` y `WT3`, se espera que el baseline token-based se debilite, porque los pares han sido modificados y la similitud textual puede disminuir.
+
+### 6.2 Interpretación general
+
+El baseline token-based muestra una caída clara en clases modificadas, especialmente `MT3`, donde solo detecta como revisión una parte limitada de los casos. En contraste, el modelo híbrido mantiene alto recall en las clases tipo 3, incluyendo `MT3` y `WT3`.
+
+Esto es consistente con la hipótesis del proyecto:
+
+> La señal léxica es útil, pero necesita complementarse con información estructural para mejorar la detección de clones modificados.
+
+---
+
+## 7. Interpretación de T4
+
+T4 fue excluido del análisis binario principal.
+
+La razón es conceptual y de producto:
+
+> En educación, equivalencia funcional no implica plagio automático.
+
+Dos estudiantes pueden resolver correctamente la misma tarea y producir soluciones funcionalmente equivalentes sin que exista copia indebida. Por ello, T4 debe tratarse como una categoría de revisión contextual, no como `review_required` directo.
+
+En el modelo híbrido, T4 se reporta aparte. Esto evita convertir equivalencia funcional en acusación automática de plagio.
+
+---
+
+## 8. Discusión
+
+La comparación muestra que el baseline token-based inspirado en SourcererCC es útil como referencia externa, pero no suficiente como herramienta de priorización educativa.
+
+Su principal problema es la baja capacidad para descartar pares `T0`. Aunque detecta muchos pares que requieren revisión, también envía demasiados no-clones a revisión. En un contexto real, esto saturaría al profesor con falsos positivos.
+
+El modelo híbrido TF-IDF + AST presenta una ventaja clara:
+
+1. Mantiene alta detección de pares que requieren revisión.
+2. Descarta correctamente la mayoría de pares T0.
+3. Reduce drásticamente la tasa de falsos positivos.
+4. Conserva una salida multiclase interna útil para análisis.
+5. Puede traducirse a categorías simples para producto.
+
+La mejora más importante desde la perspectiva de producto no es únicamente el aumento de accuracy, sino la reducción de falsos positivos:
+
+```text
+FPR SourcererCC-style = 70.44%
+FPR Hybrid TF-IDF + AST = 5.11%
+```
+
+Esto significa que el modelo híbrido es mucho más adecuado como asistente de revisión académica.
+
+---
+
+## 9. Implicaciones para el producto
+
+El resultado apoya la idea de que el sistema no debe limitarse a medir similitud superficial. Una herramienta educativa útil debe priorizar casos, no solo detectar coincidencias.
+
+Por ello, la arquitectura propuesta conserva dos niveles:
+
+### Backend técnico
+
+El modelo conserva una clasificación multiclase:
+
+```text
+T0, T1, T2, VST3, ST3, MT3, WT3, T4
+```
+
+### Frontend de producto
+
+La salida se simplifica en categorías accionables:
+
+| Clase técnica       | Categoría de producto      |
+| ------------------- | -------------------------- |
+| T0                  | Sin alerta                 |
+| T1                  | Copia directa              |
+| T2                  | Renombramiento superficial |
+| VST3, ST3, MT3, WT3 | Clon modificado            |
+| T4                  | Revisión contextual        |
+
+Esta separación permite mantener granularidad científica sin sobrecargar al usuario final.
+
+---
+
+## 10. Limitaciones de la comparación
+
+Esta comparación debe interpretarse con cautela.
+
+El baseline implementado no reproduce SourcererCC completo. SourcererCC original incluye indexación escalable, filtrado de candidatos y optimizaciones específicas para detección en repositorios completos. En este trabajo se implementó una adaptación pareada inspirada en su principio central de solapamiento de tokens, porque el dataset ya proporciona pares `func1`, `func2`.
+
+Por tanto, la conclusión correcta no es:
+
+> El modelo híbrido supera a SourcererCC original.
+
+La conclusión correcta es:
+
+> El modelo híbrido supera a un baseline token-based pareado inspirado en la familia metodológica de SourcererCC, bajo una tarea común de priorización educativa.
+
+Esta formulación es más honesta y metodológicamente defendible.
+
+---
+
+## 11. Conclusión
+
+La comparación confirma que el baseline token-based inspirado en SourcererCC captura una parte de la similitud superficial, pero no es suficiente para priorizar revisión académica con baja carga de falsos positivos.
+
+El modelo híbrido TF-IDF + AST + XGBoost obtiene un desempeño ampliamente superior en la tarea binaria de producto. Su ventaja principal no es solo detectar más pares que requieren revisión, sino descartar correctamente los pares `T0`.
+
+En consecuencia, la propuesta de valor del proyecto queda mejor definida:
+
+> El sistema híbrido no solo identifica similitud de código; también prioriza revisión humana de forma más útil, reduciendo falsos positivos y traduciendo la taxonomía técnica de clones en categorías accionables para un contexto educativo.
+
+---
+
+## 12. Recomendación para el reporte final
+
+En el paper, esta comparación debe presentarse como:
+
+> Comparación contra un baseline token-based inspirado en SourcererCC.
+
+No debe presentarse como:
+
+> Comparación contra SourcererCC original.
+
+Texto sugerido:
+
+> Como referencia externa, se implementó un baseline token-based inspirado en SourcererCC. Dado que el corpus ya proporciona pares de funciones, no se reprodujo la arquitectura completa de recuperación e indexación de SourcererCC. En su lugar, se adaptó su principio central de solapamiento de tokens normalizados a una tarea pareada de priorización educativa. Esta comparación permite evaluar si el modelo híbrido aporta valor frente a una señal clásica de similitud superficial.

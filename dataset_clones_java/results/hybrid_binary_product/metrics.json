@@ -1,0 +1,46 @@
+{
+  "model_name": "Hybrid TF-IDF + AST + XGBoost",
+  "evaluation_task": "binary_product_triage",
+  "positive_class": "review_required",
+  "negative_class": "no_alert",
+  "excluded_from_main_eval": [
+    "T4"
+  ],
+  "test_accuracy": 0.9811753902662994,
+  "precision_no_alert": 0.9595505617977528,
+  "recall_no_alert": 0.9488888888888889,
+  "f1_no_alert": 0.9541899441340781,
+  "precision_review_required": 0.986728216964801,
+  "recall_review_required": 0.9895833333333334,
+  "f1_review_required": 0.9881537127997688,
+  "macro_f1": 0.9711718284669235,
+  "weighted_f1": 0.981136405224213,
+  "balanced_accuracy": 0.9692361111111112,
+  "false_positive_rate": 0.051111111111111114,
+  "predicted_review_rate": 0.7956841138659321,
+  "tn": 427,
+  "fp": 23,
+  "fn": 18,
+  "tp": 1710,
+  "confusion_matrix": {
+    "labels": [
+      "no_alert",
+      "review_required"
+    ],
+    "values": [
+      [
+        427,
+        23
+      ],
+      [
+        18,
+        1710
+      ]
+    ]
+  },
+  "test_size_original": 2632,
+  "test_size_used_main_eval": 2178,
+  "test_size_excluded_t4": 454,
+  "parse_success_rate_test": 0.9912613981762918,
+  "runtime_seconds": 13.363637447357178
+}
