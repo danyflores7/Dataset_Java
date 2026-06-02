@@ -1,305 +1,189 @@
 #!/usr/bin/env python3
 """
-Baseline XGBoost Pipeline for Java Code Clone Multiclass Classification
+TF-IDF + XGBoost baseline for Java code clone multiclass classification.
 
-This script implements a complete end-to-end baseline pipeline:
-1. Sets seed for reproducibility.
-2. Performs a memory-efficient 1st pass to scan class distribution & record line indices.
-3. Randomly undersamples majority classes (T0, WT3, MT3) to handle extreme class imbalance.
-4. Performs a 2nd pass loading the actual code text only for the selected subset.
-5. Splits the balanced dataset into stratified Train/Valid/Test partitions.
-6. Fits a TF-IDF vectorizer on the training code and computes pairwise symmetric features:
-   - Absolute difference: |v1 - v2|
-   - Element-wise product: v1 * v2
-   - Cosine similarity: (v1 . v2) / (||v1|| * ||v2||)
-7. Trains a multiclass XGBoost classifier (with early stopping on validation).
-8. Evaluates the classifier and prints classification reports for all clone types.
+This pipeline uses the official train/valid/test splits already present in the
+repository, filters classes excluded from the active protocol (T4), and does no
+new balancing or split generation.
 """
 
-import os
+import csv
 import json
 import random
 import time
-import numpy as np
-import pandas as pd
-import xgboost as xgb
 from collections import defaultdict
-from sklearn.model_selection import train_test_split
+from pathlib import Path
+
+import joblib
+import numpy as np
+import xgboost as xgb
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, f1_score
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import classification_report, accuracy_score
 
-# ==========================================
-# 1. CONFIGURATION & REPRODUCIBILITY SEED
-# ==========================================
+from clone_experiment_config import EXCLUDED_CLASSES, filter_model_records
+
+
 SEED = 42
-MAX_SAMPLES_PER_CLASS = 3000  # Cap to balance dataset and run in minutes
-TFIDF_MAX_FEATURES = 1000     # Vocabulary size for TF-IDF
+TFIDF_MAX_FEATURES = 1000
 
-# Set global random state for reproducibility
 random.seed(SEED)
 np.random.seed(SEED)
 
-def extract_clone_type(line):
-    """
-    Highly optimized string-based parser to extract clone_type from JSONL lines
-    without parsing the entire JSON object (saving substantial memory & time).
-    """
-    idx = line.rfind('"clone_type":')
-    if idx == -1:
-        return "UNKNOWN"
-    start_quote = line.find('"', idx + 13)
-    if start_quote == -1:
-        return "UNKNOWN"
-    end_quote = line.find('"', start_quote + 1)
-    if end_quote == -1:
-        return "UNKNOWN"
-    return line[start_quote+1:end_quote]
+
+def load_jsonl(path):
+    records = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                records.append(json.loads(line))
+    return records
+
 
 def build_pairwise_features(X1_sparse, X2_sparse):
     """
-    Constructs a symmetric feature representation of code fragment pairs:
+    Constructs a symmetric feature representation:
     [ |v1 - v2|, v1 * v2, cosine_similarity(v1, v2) ]
     """
     t0 = time.time()
-    # Convert sparse matrices to dense arrays for vectorized numpy operations
     v1 = X1_sparse.toarray()
     v2 = X2_sparse.toarray()
-    
-    # 1. Absolute Difference (symmetric)
+
     abs_diff = np.abs(v1 - v2)
-    
-    # 2. Element-wise Product (symmetric)
     product = v1 * v2
-    
-    # 3. Cosine Similarity (symmetric)
+
     dot_product = np.sum(v1 * v2, axis=1)
     norm1 = np.linalg.norm(v1, axis=1)
     norm2 = np.linalg.norm(v2, axis=1)
-    epsilon = 1e-9  # Avoid division by zero
-    cosine_sim = dot_product / (norm1 * norm2 + epsilon)
+    cosine_sim = dot_product / (norm1 * norm2 + 1e-9)
     cosine_sim = cosine_sim.reshape(-1, 1)
-    
-    # Concatenate features horizontally
-    features = np.hstack([abs_diff, product, cosine_sim])
+
+    features = np.hstack([abs_diff, product, cosine_sim]).astype(np.float32)
     print(f"  Feature shape: {features.shape} generated in {time.time() - t0:.2f}s")
     return features
 
+
+def save_confusion_matrix(path, matrix, class_names):
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["actual\\predicted", *class_names])
+        for class_name, row in zip(class_names, matrix):
+            writer.writerow([class_name, *row.tolist()])
+
+
+def flatten_report(model_name, report_dict, class_names):
+    rows = []
+    for class_name in class_names:
+        values = report_dict[class_name]
+        rows.append(
+            {
+                "model": model_name,
+                "class": class_name,
+                "precision": float(values["precision"]),
+                "recall": float(values["recall"]),
+                "f1_score": float(values["f1-score"]),
+                "support": int(values["support"]),
+            }
+        )
+    return rows
+
+
+def write_csv(path, rows):
+    if not rows:
+        return
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def print_distribution(split_name, records):
+    counts = defaultdict(int)
+    for record in records:
+        counts[record["clone_type"]] += 1
+    dist = ", ".join(f"{label}: {count}" for label, count in sorted(counts.items()))
+    print(f"    {split_name} distribution: {dist}")
+
+
 def main():
     start_time = time.time()
-    
-    # Resolve directory paths relative to this script
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    model_ready_dir = os.path.join(script_dir, "model_ready")
-    
+    script_dir = Path(__file__).resolve().parent
+    data_dir = script_dir / "model_ready_balanced"
+    results_dir = script_dir / "results" / "tfidf_xgboost"
+    results_dir.mkdir(parents=True, exist_ok=True)
+
     print("=============================================================")
-    print("STARTING BASELINE XGBOOST PIPELINE FOR CODE CLONE DETECTION")
+    print("STARTING TF-IDF + XGBOOST BASELINE PIPELINE")
     print("=============================================================")
-    print(f"Data source directory: {model_ready_dir}")
+    print(f"Data source directory: {data_dir}")
+    print(f"Results directory: {results_dir}")
     print(f"Reproducibility Seed: {SEED}")
-    print(f"Max samples per class (Undersampling cap): {MAX_SAMPLES_PER_CLASS}")
-    
-    jsonl_files = ["train.jsonl", "valid.jsonl", "test.jsonl"]
-    
-    # ==========================================
-    # 2. FIRST PASS: SCAN CLASS DISTRIBUTION
-    # ==========================================
-    print("\n--- Phase 1: Scanning Dataset Class Distribution (Memory-Efficient Pass) ---")
-    class_to_lines = defaultdict(list)
-    
-    for fname in jsonl_files:
-        fpath = os.path.join(model_ready_dir, fname)
-        if not os.path.exists(fpath):
-            print(f"Error: {fpath} does not exist. Please check your data paths.")
-            return
-        
-        print(f"Scanning {fname}...")
-        t_scan = time.time()
-        with open(fpath, "r", encoding="utf-8") as f:
-            for idx, line in enumerate(f):
-                ctype = extract_clone_type(line)
-                # Keep track of file and line index
-                class_to_lines[ctype].append((fname, idx))
-        print(f"  Scanned in {time.time() - t_scan:.2f}s.")
-        
-    print("\nOriginal Class Distribution:")
-    for ctype, items in sorted(class_to_lines.items()):
-        print(f"  {ctype}: {len(items):,}")
-        
-    # ==========================================
-    # 3. UNDERSAMPLING MAJORITY CLASSES
-    # ==========================================
-    print("\n--- Phase 2: Applying Random Undersampling to Majority Classes ---")
-    selected_indices = []
-    
-    for ctype, items in sorted(class_to_lines.items()):
-        if len(items) > MAX_SAMPLES_PER_CLASS:
-            chosen = random.sample(items, MAX_SAMPLES_PER_CLASS)
-            print(f"  Class {ctype}: Undersampled {len(items):,} -> {MAX_SAMPLES_PER_CLASS}")
-        else:
-            chosen = items
-            print(f"  Class {ctype}: Kept all {len(items):,} samples")
-        selected_indices.extend(chosen)
-        
-    print(f"Total selected samples after balancing: {len(selected_indices):,}")
-    
-    # Group indices by file to read each file sequentially
-    selected_by_file = defaultdict(list)
-    for fname, idx in selected_indices:
-        selected_by_file[fname].append(idx)
-        
-    # Sort indices within each file to allow single linear scan
-    for fname in selected_by_file:
-        selected_by_file[fname].sort()
-        
-    # ==========================================
-    # 4. SECOND PASS: LOAD SUBSET CODE TEXT
-    # ==========================================
-    print("\n--- Phase 3: Loading Code Text for Selected Balanced Subset ---")
-    loaded_data = []
-    
-    for fname, indices in selected_by_file.items():
-        fpath = os.path.join(model_ready_dir, fname)
-        indices_set = set(indices)
-        loaded_count = 0
-        t_load = time.time()
-        
-        with open(fpath, "r", encoding="utf-8") as f:
-            for idx, line in enumerate(f):
-                if idx in indices_set:
-                    obj = json.loads(line)
-                    loaded_data.append({
-                        "func1": obj["func1"],
-                        "func2": obj["func2"],
-                        "clone_type": obj["clone_type"]
-                    })
-                    loaded_count += 1
-        print(f"  Loaded {loaded_count:,} samples from {fname} in {time.time() - t_load:.2f}s")
-        
-    # ==========================================
-    # 5. STRATIFIED DIVISIÓN OF DATA (SPLITS)
-    # ==========================================
-    print("\n--- Phase 4: Splitting Balanced Dataset (Train: 70%, Valid: 15%, Test: 15%) ---")
-    
-    # 1st split: Train and Temp (30%)
-    train_data, temp_data = train_test_split(
-        loaded_data,
-        test_size=0.30,
-        random_state=SEED,
-        stratify=[x["clone_type"] for x in loaded_data]
-    )
-    
-    # 2nd split: Valid (15%) and Test (15%)
-    valid_data, test_data = train_test_split(
-        temp_data,
-        test_size=0.50,
-        random_state=SEED,
-        stratify=[x["clone_type"] for x in temp_data]
-    )
-    
-    print(f"  Train size: {len(train_data):,}")
-    print(f"  Validation size: {len(valid_data):,}")
-    print(f"  Test size: {len(test_data):,}")
-    
-    # Verify split distributions
-    def print_distribution(split_name, data_list):
-        counts = defaultdict(int)
-        for x in data_list:
-            counts[x["clone_type"]] += 1
-        dist_str = ", ".join([f"{k}: {v}" for k, v in sorted(counts.items())])
-        print(f"    {split_name} distribution: {dist_str}")
-        
+    print("Using official train/valid/test splits. No new balancing or split generation.")
+    print(f"Excluded classes: {sorted(EXCLUDED_CLASSES)}")
+
+    print("\n--- Phase 1: Loading Official Balanced Splits ---")
+    train_data_raw = load_jsonl(data_dir / "train_balanced.jsonl")
+    valid_data_raw = load_jsonl(data_dir / "valid_balanced.jsonl")
+    test_data_raw = load_jsonl(data_dir / "test_balanced.jsonl")
+
+    train_data = filter_model_records(train_data_raw, "Train")
+    valid_data = filter_model_records(valid_data_raw, "Valid")
+    test_data = filter_model_records(test_data_raw, "Test")
+
+    print(f"  Original train size: {len(train_data_raw):,}")
+    print(f"  Original valid size: {len(valid_data_raw):,}")
+    print(f"  Original test size: {len(test_data_raw):,}")
+    print(f"  Active train size: {len(train_data):,}")
+    print(f"  Active valid size: {len(valid_data):,}")
+    print(f"  Active test size: {len(test_data):,}")
     print_distribution("Train", train_data)
     print_distribution("Valid", valid_data)
     print_distribution("Test", test_data)
-    
-    # ==========================================
-    # 4.5. SAVE BALANCED SUBSET TO DISK
-    # ==========================================
-    print("\n--- Phase 4.5: Saving Balanced Splits to Disk (for GitHub / Team sharing) ---")
-    balanced_out_dir = os.path.join(script_dir, "model_ready_balanced")
-    os.makedirs(balanced_out_dir, exist_ok=True)
-    
-    balanced_files = {
-        "train_balanced.jsonl": train_data,
-        "valid_balanced.jsonl": valid_data,
-        "test_balanced.jsonl": test_data
-    }
-    
-    for filename, data_list in balanced_files.items():
-        out_filepath = os.path.join(balanced_out_dir, filename)
-        with open(out_filepath, "w", encoding="utf-8") as f:
-            for item in data_list:
-                f.write(json.dumps(item) + "\n")
-        print(f"  Saved {len(data_list):,} samples to {out_filepath}")
 
-    # Extract code text and target labels for each split
-    train_f1 = [x["func1"] for x in train_data]
-    train_f2 = [x["func2"] for x in train_data]
-    train_labels = [x["clone_type"] for x in train_data]
-    
-    valid_f1 = [x["func1"] for x in valid_data]
-    valid_f2 = [x["func2"] for x in valid_data]
-    valid_labels = [x["clone_type"] for x in valid_data]
-    
-    test_f1 = [x["func1"] for x in test_data]
-    test_f2 = [x["func2"] for x in test_data]
-    test_labels = [x["clone_type"] for x in test_data]
-    
-    # ==========================================
-    # 6. FEATURE EXTRACTION (TF-IDF & SYMMETRIC PAIRS)
-    # ==========================================
-    print("\n--- Phase 5: TF-IDF Feature Extraction & Symmetric Combination ---")
-    print(f"  Fitting TfidfVectorizer (max_features={TFIDF_MAX_FEATURES})...")
-    
-    # Fit the vectorizer on the combined corpus of training functions
+    train_f1 = [record["func1"] for record in train_data]
+    train_f2 = [record["func2"] for record in train_data]
+    train_labels = [record["clone_type"] for record in train_data]
+
+    valid_f1 = [record["func1"] for record in valid_data]
+    valid_f2 = [record["func2"] for record in valid_data]
+    valid_labels = [record["clone_type"] for record in valid_data]
+
+    test_f1 = [record["func1"] for record in test_data]
+    test_f2 = [record["func2"] for record in test_data]
+    test_labels = [record["clone_type"] for record in test_data]
+
+    print("\n--- Phase 2: TF-IDF Feature Extraction ---")
     vectorizer = TfidfVectorizer(
         max_features=TFIDF_MAX_FEATURES,
-        token_pattern=r'(?u)\b\w+\b'  # Standard word boundaries
+        token_pattern=r"(?u)\b\w+\b",
     )
-    # Combine training functions for fitting
-    train_corpus = train_f1 + train_f2
-    vectorizer.fit(train_corpus)
-    
-    print("  Transforming training splits...")
+    vectorizer.fit(train_f1 + train_f2)
+
+    print("  Transforming splits...")
     X1_train = vectorizer.transform(train_f1)
     X2_train = vectorizer.transform(train_f2)
-    
-    print("  Transforming validation splits...")
     X1_valid = vectorizer.transform(valid_f1)
     X2_valid = vectorizer.transform(valid_f2)
-    
-    print("  Transforming test splits...")
     X1_test = vectorizer.transform(test_f1)
     X2_test = vectorizer.transform(test_f2)
-    
-    print("  Generating paired features (absolute diff, element product, cosine)...")
+
+    print("  Building pairwise features...")
     print("    Train features:")
     X_train = build_pairwise_features(X1_train, X2_train)
-    print("    Validation features:")
+    print("    Valid features:")
     X_valid = build_pairwise_features(X1_valid, X2_valid)
     print("    Test features:")
     X_test = build_pairwise_features(X1_test, X2_test)
-    
-    # ==========================================
-    # 7. LABEL ENCODING
-    # ==========================================
-    print("\n--- Phase 6: Encoding Multi-class Target Labels ---")
+
+    print("\n--- Phase 3: Encoding Labels ---")
     label_encoder = LabelEncoder()
     y_train = label_encoder.fit_transform(train_labels)
     y_valid = label_encoder.transform(valid_labels)
     y_test = label_encoder.transform(test_labels)
-    
-    classes_mapping = {idx: name for idx, name in enumerate(label_encoder.classes_)}
-    print(f"  Encoded mapping: {classes_mapping}")
-    
-    # ==========================================
-    # 8. TRAINING XGBOOST CLASSIFIER
-    # ==========================================
-    print("\n--- Phase 7: Training Multiclass XGBClassifier ---")
-    
-    # Configure multiclass XGBoost classifier
-    # Multiclass classification uses multi:softprob internally
+    print(f"  Encoded mapping: {dict(enumerate(label_encoder.classes_))}")
+
+    print("\n--- Phase 4: Training XGBoost ---")
     clf = xgb.XGBClassifier(
         n_estimators=300,
         max_depth=6,
@@ -307,37 +191,92 @@ def main():
         random_state=SEED,
         eval_metric="mlogloss",
         early_stopping_rounds=15,
-        tree_method="hist",  # Fast histogram method
-        n_jobs=-1            # Use all available CPU cores
+        tree_method="hist",
+        n_jobs=-1,
     )
-    
     t_train = time.time()
-    clf.fit(
-        X_train, y_train,
-        eval_set=[(X_valid, y_valid)],
-        verbose=50  # Print progress every 50 rounds
-    )
+    clf.fit(X_train, y_train, eval_set=[(X_valid, y_valid)], verbose=50)
     print(f"  Training finished in {time.time() - t_train:.2f}s. Best iteration: {clf.best_iteration}")
-    
-    # ==========================================
-    # 9. EVALUATION & CLASSIFICATION REPORT
-    # ==========================================
-    print("\n--- Phase 8: Evaluating Model Performance on Test Set ---")
-    
+
+    print("\n--- Phase 5: Evaluating on Test ---")
     t_predict = time.time()
     y_pred = clf.predict(X_test)
     predict_time = time.time() - t_predict
-    
-    acc = accuracy_score(y_test, y_pred)
-    print(f"  Accuracy: {acc:.4f} (Inference time: {predict_time:.3f}s)")
-    
-    print("\n" + "="*60)
+
+    accuracy = accuracy_score(y_test, y_pred)
+    macro_f1 = f1_score(y_test, y_pred, average="macro")
+    weighted_f1 = f1_score(y_test, y_pred, average="weighted")
+    report = classification_report(
+        y_test,
+        y_pred,
+        labels=np.arange(len(label_encoder.classes_)),
+        target_names=label_encoder.classes_,
+        digits=4,
+        zero_division=0,
+    )
+    report_dict = classification_report(
+        y_test,
+        y_pred,
+        labels=np.arange(len(label_encoder.classes_)),
+        target_names=label_encoder.classes_,
+        output_dict=True,
+        zero_division=0,
+    )
+    conf_matrix = confusion_matrix(y_test, y_pred, labels=np.arange(len(label_encoder.classes_)))
+
+    print("\n" + "=" * 60)
     print("DETAILED MULTICLASS CLASSIFICATION REPORT (TEST SPLIT)")
-    print("="*60)
-    print(classification_report(y_test, y_pred, target_names=label_encoder.classes_, digits=4))
-    print("="*60)
-    
-    print(f"\nPipeline finished successfully in {time.time() - start_time:.2f}s.")
+    print("=" * 60)
+    print(report)
+    print("=" * 60)
+
+    metrics = {
+        "model": "TF-IDF + XGBoost",
+        "accuracy": float(accuracy),
+        "macro_f1": float(macro_f1),
+        "weighted_f1": float(weighted_f1),
+        "original_train_size": len(train_data_raw),
+        "original_valid_size": len(valid_data_raw),
+        "original_test_size": len(test_data_raw),
+        "train_size": len(train_data),
+        "valid_size": len(valid_data),
+        "test_size": len(test_data),
+        "excluded_classes": sorted(EXCLUDED_CLASSES),
+        "active_classes": list(label_encoder.classes_),
+        "feature_count": int(X_train.shape[1]),
+        "tfidf_max_features": TFIDF_MAX_FEATURES,
+        "best_iteration": int(clf.best_iteration),
+        "predict_time_seconds": float(predict_time),
+        "execution_time_seconds": float(time.time() - start_time),
+    }
+
+    print("Saving results and artifacts...")
+    with open(results_dir / "metrics.json", "w", encoding="utf-8") as f:
+        json.dump(metrics, f, indent=2)
+    with open(results_dir / "classification_report.txt", "w", encoding="utf-8") as f:
+        f.write(report)
+    save_confusion_matrix(results_dir / "confusion_matrix.csv", conf_matrix, label_encoder.classes_)
+    write_csv(
+        results_dir / "per_class_metrics.csv",
+        flatten_report(metrics["model"], report_dict, label_encoder.classes_),
+    )
+    joblib.dump(
+        {
+            "model": clf,
+            "tfidf_vectorizer": vectorizer,
+            "label_encoder": label_encoder,
+            "tfidf_max_features": TFIDF_MAX_FEATURES,
+        },
+        results_dir / "model.joblib",
+    )
+    with open(results_dir / "label_mapping.json", "w", encoding="utf-8") as f:
+        json.dump({str(i): c for i, c in enumerate(label_encoder.classes_)}, f, indent=2)
+
+    print(f"Accuracy: {accuracy:.4f}")
+    print(f"Macro F1: {macro_f1:.4f}")
+    print(f"Weighted F1: {weighted_f1:.4f}")
+    print(f"Pipeline finished successfully in {time.time() - start_time:.2f}s.")
+
 
 if __name__ == "__main__":
     main()

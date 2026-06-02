@@ -1,0 +1,29 @@
+{
+  "model": "TF-IDF + XGBoost",
+  "accuracy": 0.8185151237396884,
+  "macro_f1": 0.8584842868145025,
+  "weighted_f1": 0.8179582124806793,
+  "original_train_size": 12281,
+  "original_valid_size": 2632,
+  "original_test_size": 2632,
+  "train_size": 10181,
+  "valid_size": 2182,
+  "test_size": 2182,
+  "excluded_classes": [
+    "T4"
+  ],
+  "active_classes": [
+    "MT3",
+    "ST3",
+    "T0",
+    "T1",
+    "T2",
+    "VST3",
+    "WT3"
+  ],
+  "feature_count": 2001,
+  "tfidf_max_features": 1000,
+  "best_iteration": 299,
+  "predict_time_seconds": 0.049477577209472656,
+  "execution_time_seconds": 176.81221294403076
+}

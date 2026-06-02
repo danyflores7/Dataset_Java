@@ -1,0 +1,24 @@
+{
+  "evaluation": "binary_product_view_posthoc_no_t4",
+  "posthoc_filter": true,
+  "retrained_without_t4": false,
+  "labels": [
+    "no_alert",
+    "review_required"
+  ],
+  "accuracy": 0.9252978918423465,
+  "macro_f1": 0.887479479730292,
+  "weighted_f1": 0.9258061234675677,
+  "balanced_accuracy": 0.8929073646394663,
+  "precision_no_alert": 0.8072805139186295,
+  "recall_no_alert": 0.8377777777777777,
+  "f1_no_alert": 0.8222464558342422,
+  "precision_review_required": 0.9574344023323615,
+  "recall_review_required": 0.9480369515011547,
+  "f1_review_required": 0.9527125036263417,
+  "false_positive_rate": 0.1622222222222222,
+  "tn": 377,
+  "fp": 73,
+  "fn": 90,
+  "tp": 1642
+}

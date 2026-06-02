@@ -1,0 +1,15 @@
+CodeBERT + XGBoost post-hoc no-T4 evaluation
+T4 ground-truth rows are excluded. Predicted T4 remains an error.
+
+class         precision     recall   f1-score   support
+T0               0.8073     0.8378     0.8222       450
+T1               1.0000     1.0000     1.0000       229
+T2               1.0000     0.8846     0.9388        52
+VST3             0.9307     0.9307     0.9307       101
+ST3              0.8130     0.8600     0.8359       450
+MT3              0.6280     0.6489     0.6383       450
+WT3              0.7727     0.6800     0.7234       450
+
+accuracy                               0.7933      2182
+macro avg                              0.8413      2182
+weighted avg                           0.7932      2182

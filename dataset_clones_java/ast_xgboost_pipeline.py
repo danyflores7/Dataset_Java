@@ -28,6 +28,8 @@ from sklearn.metrics import (
 from sklearn.preprocessing import LabelEncoder
 from tqdm import tqdm
 
+from clone_experiment_config import EXCLUDED_CLASSES, filter_model_records
+
 
 SEED = 42
 EPSILON = 1e-9
@@ -248,6 +250,32 @@ def save_confusion_matrix(path: Path, matrix: np.ndarray, class_names: np.ndarra
             writer.writerow([class_name, *row.tolist()])
 
 
+def flatten_report(model_name: str, report_dict: dict, class_names: np.ndarray) -> list[dict]:
+    rows = []
+    for class_name in class_names:
+        values = report_dict[class_name]
+        rows.append(
+            {
+                "model": model_name,
+                "class": class_name,
+                "precision": float(values["precision"]),
+                "recall": float(values["recall"]),
+                "f1_score": float(values["f1-score"]),
+                "support": int(values["support"]),
+            }
+        )
+    return rows
+
+
+def write_csv(path: Path, rows: list[dict]) -> None:
+    if not rows:
+        return
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(rows)
+
+
 def main() -> None:
     start_time = time.time()
     script_dir = Path(__file__).resolve().parent
@@ -265,9 +293,14 @@ def main() -> None:
     print(f"Reproducibility Seed: {SEED}")
 
     print("Loading balanced splits...")
-    train_data = load_jsonl(str(train_path))
-    valid_data = load_jsonl(str(valid_path))
-    test_data = load_jsonl(str(test_path))
+    train_data_raw = load_jsonl(str(train_path))
+    valid_data_raw = load_jsonl(str(valid_path))
+    test_data_raw = load_jsonl(str(test_path))
+
+    print("Filtering classes excluded from model training/evaluation...")
+    train_data = filter_model_records(train_data_raw, "Train")
+    valid_data = filter_model_records(valid_data_raw, "Valid")
+    test_data = filter_model_records(test_data_raw, "Test")
 
     print(f"Train size: {len(train_data):,}")
     print(f"Valid size: {len(valid_data):,}")
@@ -332,6 +365,14 @@ def main() -> None:
         digits=4,
         zero_division=0,
     )
+    report_dict = classification_report(
+        y_test,
+        y_pred,
+        labels=np.arange(len(label_encoder.classes_)),
+        target_names=label_encoder.classes_,
+        output_dict=True,
+        zero_division=0,
+    )
     conf_matrix = confusion_matrix(
         y_test,
         y_pred,
@@ -347,6 +388,10 @@ def main() -> None:
         "train_size": len(train_data),
         "valid_size": len(valid_data),
         "test_size": len(test_data),
+        "train_size_original": len(train_data_raw),
+        "valid_size_original": len(valid_data_raw),
+        "test_size_original": len(test_data_raw),
+        "excluded_classes": sorted(EXCLUDED_CLASSES),
         "feature_count": int(X_train.shape[1]),
         "parse_success_rate_train": parse_success_rate_train,
         "parse_success_rate_valid": parse_success_rate_valid,
@@ -363,6 +408,10 @@ def main() -> None:
         results_dir / "confusion_matrix.csv",
         conf_matrix,
         label_encoder.classes_,
+    )
+    write_csv(
+        results_dir / "per_class_metrics.csv",
+        flatten_report(metrics["model"], report_dict, label_encoder.classes_),
     )
 
     joblib.dump(clf, results_dir / "model.joblib")

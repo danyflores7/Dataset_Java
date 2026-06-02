@@ -1,0 +1,5 @@
+model,evaluation,accuracy,macro_f1,weighted_f1,train_size,valid_size,test_size,excluded_classes,posthoc_filter,retrained_without_t4,metrics_file
+TF-IDF + XGBoost,multiclass_no_t4,0.8185151237396884,0.8584842868145025,0.8179582124806793,10181,2182,2182,T4,False,True,tfidf_xgboost\metrics.json
+AST + XGBoost,multiclass_no_t4,0.7346471127406049,0.7296112033314841,0.7345592561689904,10181,2182,2182,T4,False,True,ast_xgboost\metrics.json
+Hybrid TF-IDF + AST + XGBoost,multiclass_no_t4,0.9133822181484876,0.9336601028490276,0.9131836033392889,10181,2182,2182,T4,False,True,hybrid_xgboost\metrics.json
+CodeBERT + XGBoost (post-hoc no T4),multiclass_posthoc_no_t4,0.7933088909257562,0.8413176840762974,0.7931742303350109,,,2182,T4,True,False,codebert_xgboost\metrics_no_t4_eval.json

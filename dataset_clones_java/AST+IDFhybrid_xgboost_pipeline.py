@@ -30,6 +30,7 @@ from ast_xgboost_pipeline import (
     load_jsonl,
     save_confusion_matrix,
 )
+from clone_experiment_config import EXCLUDED_CLASSES, filter_model_records
 
 
 TFIDF_MAX_FEATURES = 1000
@@ -53,7 +54,6 @@ BASELINE_PER_CLASS = {
     "T0": {"precision": 0.9626, "recall": 0.9733, "f1_score": 0.9680, "support": 450},
     "T1": {"precision": 0.9871, "recall": 1.0000, "f1_score": 0.9935, "support": 229},
     "T2": {"precision": 0.9792, "recall": 0.9038, "f1_score": 0.9400, "support": 52},
-    "T4": {"precision": 0.9956, "recall": 0.9978, "f1_score": 0.9967, "support": 450},
     "VST3": {"precision": 0.9143, "recall": 0.9505, "f1_score": 0.9320, "support": 101},
     "WT3": {"precision": 0.7488, "recall": 0.6889, "f1_score": 0.7176, "support": 450},
 }
@@ -64,7 +64,6 @@ AST_PER_CLASS = {
     "T0": {"precision": 0.6330, "recall": 0.5289, "f1_score": 0.5763, "support": 450},
     "T1": {"precision": 0.9784, "recall": 0.7904, "f1_score": 0.8744, "support": 229},
     "T2": {"precision": 0.4300, "recall": 0.8269, "f1_score": 0.5658, "support": 52},
-    "T4": {"precision": 0.9758, "recall": 0.9867, "f1_score": 0.9812, "support": 450},
     "VST3": {"precision": 0.8191, "recall": 0.7624, "f1_score": 0.7897, "support": 101},
     "WT3": {"precision": 0.6898, "recall": 0.7067, "f1_score": 0.6981, "support": 450},
 }
@@ -138,6 +137,16 @@ def load_ast_metrics(results_dir: Path) -> dict:
         return json.load(f)
 
 
+def load_tfidf_metrics(results_dir: Path) -> dict:
+    """Load TF-IDF aggregate metrics when available."""
+    tfidf_metrics_path = results_dir / "tfidf_xgboost" / "metrics.json"
+    if not tfidf_metrics_path.exists():
+        return BASELINE_SUMMARY
+
+    with open(tfidf_metrics_path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
 def flatten_report(
     model_name: str,
     report_dict: dict,
@@ -177,6 +186,25 @@ def static_per_class_rows(model_name: str, metrics_by_class: dict) -> list[dict]
     return rows
 
 
+def load_per_class_csv(path: Path) -> list[dict]:
+    if not path.exists():
+        return []
+
+    with open(path, "r", encoding="utf-8", newline="") as f:
+        return [
+            {
+                "model": row["model"],
+                "class": row["class"],
+                "precision": float(row["precision"]),
+                "recall": float(row["recall"]),
+                "f1_score": float(row["f1_score"]),
+                "support": int(row["support"]),
+            }
+            for row in csv.DictReader(f)
+            if row["class"] not in EXCLUDED_CLASSES
+        ]
+
+
 def write_csv(path: Path, rows: list[dict]) -> None:
     """Write rows as CSV using the keys from the first row."""
     if not rows:
@@ -190,6 +218,7 @@ def write_csv(path: Path, rows: list[dict]) -> None:
 
 def save_comparison_metrics(
     results_dir: Path,
+    tfidf_metrics: dict,
     ast_metrics: dict,
     hybrid_metrics: dict,
     hybrid_report_dict: dict,
@@ -198,17 +227,18 @@ def save_comparison_metrics(
     """Save aggregate and per-class comparison tables for later visualizations."""
     summary_rows = [
         {
-            "model": BASELINE_SUMMARY["model"],
-            "accuracy": BASELINE_SUMMARY["accuracy"],
-            "macro_f1": BASELINE_SUMMARY["macro_f1"],
-            "weighted_f1": BASELINE_SUMMARY["weighted_f1"],
-            "feature_count": BASELINE_SUMMARY["feature_count"],
-            "train_size": hybrid_metrics["train_size"],
-            "valid_size": hybrid_metrics["valid_size"],
-            "test_size": hybrid_metrics["test_size"],
+            "model": tfidf_metrics["model"],
+            "accuracy": tfidf_metrics["accuracy"],
+            "macro_f1": tfidf_metrics["macro_f1"],
+            "weighted_f1": tfidf_metrics["weighted_f1"],
+            "feature_count": tfidf_metrics["feature_count"],
+            "train_size": tfidf_metrics.get("train_size", hybrid_metrics["train_size"]),
+            "valid_size": tfidf_metrics.get("valid_size", hybrid_metrics["valid_size"]),
+            "test_size": tfidf_metrics.get("test_size", hybrid_metrics["test_size"]),
             "parse_success_rate_train": "",
             "parse_success_rate_valid": "",
             "parse_success_rate_test": "",
+            "excluded_classes": ",".join(sorted(EXCLUDED_CLASSES)),
         },
         {
             "model": "AST + XGBoost",
@@ -222,6 +252,7 @@ def save_comparison_metrics(
             "parse_success_rate_train": ast_metrics.get("parse_success_rate_train", ""),
             "parse_success_rate_valid": ast_metrics.get("parse_success_rate_valid", ""),
             "parse_success_rate_test": ast_metrics.get("parse_success_rate_test", ""),
+            "excluded_classes": ",".join(ast_metrics.get("excluded_classes", sorted(EXCLUDED_CLASSES))),
         },
         {
             "model": hybrid_metrics["model"],
@@ -235,12 +266,23 @@ def save_comparison_metrics(
             "parse_success_rate_train": hybrid_metrics["parse_success_rate_train"],
             "parse_success_rate_valid": hybrid_metrics["parse_success_rate_valid"],
             "parse_success_rate_test": hybrid_metrics["parse_success_rate_test"],
+            "excluded_classes": ",".join(hybrid_metrics.get("excluded_classes", sorted(EXCLUDED_CLASSES))),
         },
     ]
 
     per_class_rows = []
-    per_class_rows.extend(static_per_class_rows(BASELINE_SUMMARY["model"], BASELINE_PER_CLASS))
-    per_class_rows.extend(static_per_class_rows("AST + XGBoost", AST_PER_CLASS))
+    tfidf_per_class = load_per_class_csv(results_dir / "tfidf_xgboost" / "per_class_metrics.csv")
+    ast_per_class = load_per_class_csv(results_dir / "ast_xgboost" / "per_class_metrics.csv")
+    per_class_rows.extend(
+        tfidf_per_class
+        if tfidf_per_class
+        else static_per_class_rows(BASELINE_SUMMARY["model"], BASELINE_PER_CLASS)
+    )
+    per_class_rows.extend(
+        ast_per_class
+        if ast_per_class
+        else static_per_class_rows("AST + XGBoost", AST_PER_CLASS)
+    )
     per_class_rows.extend(
         flatten_report(hybrid_metrics["model"], hybrid_report_dict, class_names)
     )
@@ -272,9 +314,14 @@ def main() -> None:
     print(f"Reproducibility Seed: {SEED}")
 
     print("Loading balanced splits...")
-    train_data = load_jsonl(str(data_dir / "train_balanced.jsonl"))
-    valid_data = load_jsonl(str(data_dir / "valid_balanced.jsonl"))
-    test_data = load_jsonl(str(data_dir / "test_balanced.jsonl"))
+    train_data_raw = load_jsonl(str(data_dir / "train_balanced.jsonl"))
+    valid_data_raw = load_jsonl(str(data_dir / "valid_balanced.jsonl"))
+    test_data_raw = load_jsonl(str(data_dir / "test_balanced.jsonl"))
+
+    print("Filtering classes excluded from model training/evaluation...")
+    train_data = filter_model_records(train_data_raw, "Train")
+    valid_data = filter_model_records(valid_data_raw, "Valid")
+    test_data = filter_model_records(test_data_raw, "Test")
 
     print(f"Train size: {len(train_data):,}")
     print(f"Valid size: {len(valid_data):,}")
@@ -375,6 +422,10 @@ def main() -> None:
         "train_size": len(train_data),
         "valid_size": len(valid_data),
         "test_size": len(test_data),
+        "train_size_original": len(train_data_raw),
+        "valid_size_original": len(valid_data_raw),
+        "test_size_original": len(test_data_raw),
+        "excluded_classes": sorted(EXCLUDED_CLASSES),
         "feature_count": int(X_train.shape[1]),
         "tfidf_feature_count": int(X_train_tfidf.shape[1]),
         "ast_feature_count": int(X_train_ast.shape[1]),
@@ -416,6 +467,7 @@ def main() -> None:
 
     save_comparison_metrics(
         results_root,
+        load_tfidf_metrics(results_root),
         load_ast_metrics(results_root),
         metrics,
         report_dict,

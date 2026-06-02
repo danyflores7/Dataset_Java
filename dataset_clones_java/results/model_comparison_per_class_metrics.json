@@ -41,14 +41,6 @@
   },
   {
     "model": "TF-IDF + XGBoost",
-    "class": "T4",
-    "precision": 0.9956,
-    "recall": 0.9978,
-    "f1_score": 0.9967,
-    "support": 450
-  },
-  {
-    "model": "TF-IDF + XGBoost",
     "class": "VST3",
     "precision": 0.9143,
     "recall": 0.9505,
@@ -105,14 +97,6 @@
   },
   {
     "model": "AST + XGBoost",
-    "class": "T4",
-    "precision": 0.9758,
-    "recall": 0.9867,
-    "f1_score": 0.9812,
-    "support": 450
-  },
-  {
-    "model": "AST + XGBoost",
     "class": "VST3",
     "precision": 0.8191,
     "recall": 0.7624,
@@ -130,25 +114,25 @@
   {
     "model": "Hybrid TF-IDF + AST + XGBoost",
     "class": "MT3",
-    "precision": 0.819634703196347,
-    "recall": 0.7977777777777778,
-    "f1_score": 0.8085585585585585,
+    "precision": 0.8208616780045351,
+    "recall": 0.8044444444444444,
+    "f1_score": 0.8125701459034792,
     "support": 450
   },
   {
     "model": "Hybrid TF-IDF + AST + XGBoost",
     "class": "ST3",
-    "precision": 0.8789808917197452,
-    "recall": 0.92,
-    "f1_score": 0.8990228013029316,
+    "precision": 0.8842105263157894,
+    "recall": 0.9333333333333333,
+    "f1_score": 0.9081081081081082,
     "support": 450
   },
   {
     "model": "Hybrid TF-IDF + AST + XGBoost",
     "class": "T0",
-    "precision": 0.9707865168539326,
-    "recall": 0.96,
-    "f1_score": 0.9653631284916201,
+    "precision": 0.9646017699115044,
+    "recall": 0.9688888888888889,
+    "f1_score": 0.9667405764966741,
     "support": 450
   },
   {
@@ -169,26 +153,18 @@
   },
   {
     "model": "Hybrid TF-IDF + AST + XGBoost",
-    "class": "T4",
-    "precision": 0.9933774834437086,
-    "recall": 1.0,
-    "f1_score": 0.9966777408637874,
-    "support": 450
-  },
-  {
-    "model": "Hybrid TF-IDF + AST + XGBoost",
     "class": "VST3",
-    "precision": 0.9797979797979798,
-    "recall": 0.9603960396039604,
-    "f1_score": 0.97,
+    "precision": 0.98989898989899,
+    "recall": 0.9702970297029703,
+    "f1_score": 0.98,
     "support": 101
   },
   {
     "model": "Hybrid TF-IDF + AST + XGBoost",
     "class": "WT3",
-    "precision": 0.9035874439461884,
-    "recall": 0.8955555555555555,
-    "f1_score": 0.8995535714285714,
+    "precision": 0.9172413793103448,
+    "recall": 0.8866666666666667,
+    "f1_score": 0.9016949152542373,
     "support": 450
   }
 ]

@@ -4,7 +4,7 @@ Binary product-triage evaluation for the Hybrid TF-IDF + AST + XGBoost model.
 
 The hybrid model is trained as a multiclass classifier. This script does not
 retrain it and does not create new splits; it only evaluates existing test data
-with the same binary product mapping used by the SourcererCC-style baseline.
+after dropping classes excluded from all model comparisons.
 """
 
 import argparse
@@ -19,6 +19,7 @@ from sklearn.metrics import classification_report, confusion_matrix
 
 from ast_xgboost_pipeline import extract_split_features as extract_ast_pair_features
 from ast_xgboost_pipeline import load_jsonl
+from clone_experiment_config import EXCLUDED_CLASSES, filter_model_records
 
 
 MODEL_NAME = "Hybrid TF-IDF + AST + XGBoost"
@@ -27,9 +28,8 @@ POSITIVE_CLASS = "review_required"
 NEGATIVE_CLASS = "no_alert"
 NO_ALERT_CLASS = "T0"
 REVIEW_CLASSES = {"T1", "T2", "VST3", "ST3", "MT3", "WT3"}
-CONTEXTUAL_CLASS = "T4"
 BINARY_LABELS = [NEGATIVE_CLASS, POSITIVE_CLASS]
-PER_CLASS_ORDER = ["T1", "T2", "VST3", "ST3", "MT3", "WT3", "T4"]
+PER_CLASS_ORDER = ["T1", "T2", "VST3", "ST3", "MT3", "WT3"]
 EPSILON = 1e-9
 
 
@@ -97,7 +97,7 @@ def class_to_binary_label(class_name: str) -> str | None:
         return NEGATIVE_CLASS
     if class_name in REVIEW_CLASSES:
         return POSITIVE_CLASS
-    if class_name == CONTEXTUAL_CLASS:
+    if class_name in EXCLUDED_CLASSES:
         return None
     raise ValueError(f"Unsupported clone class: {class_name}")
 
@@ -108,15 +108,15 @@ def build_prediction_rows(records: list[dict], predicted_classes: np.ndarray) ->
         clone_type = record["clone_type"]
         binary_label = class_to_binary_label(clone_type)
         predicted_binary = class_to_binary_label(str(predicted_multiclass))
-        excluded = clone_type == CONTEXTUAL_CLASS or str(predicted_multiclass) == CONTEXTUAL_CLASS
+        excluded = binary_label is None or predicted_binary is None
 
         rows.append(
             {
                 "index": index,
                 "clone_type": clone_type,
                 "predicted_multiclass": str(predicted_multiclass),
-                "binary_label": binary_label if binary_label is not None else "contextual_t4",
-                "predicted_binary": predicted_binary if predicted_binary is not None else "contextual_t4",
+                "binary_label": binary_label if binary_label is not None else "excluded_class",
+                "predicted_binary": predicted_binary if predicted_binary is not None else "excluded_class",
                 "excluded_from_main_eval": excluded,
                 "correct_binary": "" if excluded else binary_label == predicted_binary,
             }
@@ -214,21 +214,6 @@ def per_original_class_report(rows: list[dict]) -> list[dict]:
     return report_rows
 
 
-def t4_contextual_report(rows: list[dict]) -> dict:
-    t4_rows = [row for row in rows if row["clone_type"] == CONTEXTUAL_CLASS]
-    support = len(t4_rows)
-    predicted_review = sum(row["predicted_binary"] == POSITIVE_CLASS for row in t4_rows)
-    return {
-        "support": support,
-        "predicted_review_required": predicted_review,
-        "review_required_rate": predicted_review / support if support else 0.0,
-        "note": (
-            "T4 is excluded from the main binary comparison because functional equivalence "
-            "does not imply plagiarism automatically in educational settings."
-        ),
-    }
-
-
 def write_csv(path: Path, rows: list[dict]) -> None:
     if not rows:
         return
@@ -268,7 +253,7 @@ def save_classification_report(path: Path, rows: list[dict]) -> None:
 def print_console_summary(metrics: dict, per_class_rows: list[dict]) -> None:
     print(f"Modelo: {MODEL_NAME}")
     print(f"Evaluation: {EVALUATION_TASK}")
-    print("T4 excluded: true")
+    print(f"Excluded classes: {', '.join(sorted(EXCLUDED_CLASSES))}")
     print(f"Accuracy: {metrics['test_accuracy']:.4f}")
     print(f"Macro F1: {metrics['macro_f1']:.4f}")
     print(f"Balanced accuracy: {metrics['balanced_accuracy']:.4f}")
@@ -280,8 +265,7 @@ def print_console_summary(metrics: dict, per_class_rows: list[dict]) -> None:
     print("\nRecall by original class:")
     for row in per_class_rows:
         label = row["original_class"]
-        suffix = " contextual" if label == CONTEXTUAL_CLASS else ""
-        print(f"  {label}{suffix}: {row['recall_as_review_required']:.4f}")
+        print(f"  {label}: {row['recall_as_review_required']:.4f}")
 
 
 def main() -> None:
@@ -305,7 +289,8 @@ def main() -> None:
         raise FileNotFoundError(f"Hybrid model artifact not found: {model_path}")
 
     print("Loading test split and trained hybrid model...")
-    test_data = load_jsonl(str(test_path))
+    test_data_raw = load_jsonl(str(test_path))
+    test_data = filter_model_records(test_data_raw, "Test")
     model_bundle = joblib.load(model_path)
     model = model_bundle["model"]
     label_encoder = model_bundle["label_encoder"]
@@ -320,19 +305,19 @@ def main() -> None:
     main_rows = main_eval_rows(prediction_rows)
     metrics_values = compute_binary_metrics(main_rows)
     per_class_rows = per_original_class_report(prediction_rows)
-    t4_report = t4_contextual_report(prediction_rows)
 
-    excluded_t4_count = len(prediction_rows) - len(main_rows)
+    excluded_prediction_count = len(prediction_rows) - len(main_rows)
     metrics = {
         "model_name": MODEL_NAME,
         "evaluation_task": EVALUATION_TASK,
         "positive_class": POSITIVE_CLASS,
         "negative_class": NEGATIVE_CLASS,
-        "excluded_from_main_eval": [CONTEXTUAL_CLASS],
+        "excluded_from_main_eval": sorted(EXCLUDED_CLASSES),
         **metrics_values,
-        "test_size_original": len(prediction_rows),
+        "test_size_original": len(test_data_raw),
         "test_size_used_main_eval": len(main_rows),
-        "test_size_excluded_t4": excluded_t4_count,
+        "test_size_excluded_classes": len(test_data_raw) - len(test_data),
+        "test_size_excluded_predictions": excluded_prediction_count,
         "parse_success_rate_test": parse_success_rate_test,
         "runtime_seconds": time.time() - start_time,
     }
@@ -345,7 +330,6 @@ def main() -> None:
     )
     save_classification_report(results_dir / "classification_report.txt", main_rows)
     save_json(results_dir / "metrics.json", metrics)
-    save_json(results_dir / "t4_contextual_test_report.json", t4_report)
 
     print_console_summary(metrics, per_class_rows)
     print(f"\nSaved results to: {results_dir}")

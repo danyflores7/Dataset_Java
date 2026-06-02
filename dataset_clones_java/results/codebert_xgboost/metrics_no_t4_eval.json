@@ -1,0 +1,27 @@
+{
+  "model": "CodeBERT + XGBoost",
+  "evaluation": "multiclass_posthoc_no_t4",
+  "posthoc_filter": true,
+  "retrained_without_t4": false,
+  "excluded_actual_classes": [
+    "T4"
+  ],
+  "active_classes": [
+    "T0",
+    "T1",
+    "T2",
+    "VST3",
+    "ST3",
+    "MT3",
+    "WT3"
+  ],
+  "accuracy": 0.7933088909257562,
+  "macro_f1": 0.8413176840762974,
+  "weighted_f1": 0.7931742303350109,
+  "test_size": 2182,
+  "correct_predictions": 1731,
+  "excluded_actual_support": 450,
+  "predicted_excluded_class_for_active_rows": 2,
+  "source_confusion_matrix": "C:\\Users\\blast\\Downloads\\java_dataset\\Dataset_Java\\dataset_clones_java\\results\\codebert_xgboost\\confusion_matrix.csv",
+  "binary_product_metrics_file": "binary_product_metrics_no_t4_eval.json"
+}

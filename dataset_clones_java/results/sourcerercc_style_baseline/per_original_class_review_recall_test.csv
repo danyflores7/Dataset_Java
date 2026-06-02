@@ -1,8 +1,0 @@
-original_class,support,predicted_review_required,recall_as_review_required
-T1,229,229,1.0
-T2,52,52,1.0
-VST3,101,101,1.0
-ST3,450,354,0.7866666666666666
-MT3,450,255,0.5666666666666667
-WT3,450,369,0.82
-T4,450,354,0.7866666666666666
